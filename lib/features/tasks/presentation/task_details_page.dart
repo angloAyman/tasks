@@ -417,17 +417,24 @@ class _TaskDetailsPageState extends State<TaskDetailsPage> {
             IconButton(
               icon: const Icon(Icons.attach_file),
               onPressed: () async {
-                final result = await FilePicker.platform.pickFiles(
-                  allowMultiple: false,
-                  type: FileType.any,
-                );
-                if (result != null && result.files.single.path != null) {
-                  final file = File(result.files.single.path!);
+                // final result = await FilePicker.platform.pickFiles(
+                //   allowMultiple: false,
+                //   type: FileType.any,
+                // );
+                // if (result != null && result.files.single.path != null) {
+                //   final file = File(result.files.single.path!);
+
+                  final result = await FilePicker.platform.pickFiles();
+
+                  if (result != null && result.files.isNotEmpty) {
+                    final pickedFile = result.files.single;
+
+
                   context.read<TaskChatCubit>().sendFileMessage(
                     taskId: taskId,
                     senderId: currentUserId,
                     senderName: widget.currentUser['username'],
-                    file: file,
+                     pickedFile: pickedFile,
                   );
                 }
               },

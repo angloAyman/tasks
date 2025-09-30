@@ -1,6 +1,9 @@
 
 
-import 'dart:io';
+import 'dart:typed_data';
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:io' show File;
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -119,45 +122,103 @@ class TaskChatCubit extends Cubit<TaskChatState> {
     }
   }
 
+  // Future<void> sendFileMessage({
+  //   required String taskId,
+  //   required String senderId,
+  //   required String senderName,
+  //   required File file,
+  // }) async {
+  //   try {
+  //     final ext = file.path.split('.').last;
+  //     final fileType = _detectFileType(ext);
+  //
+  //     final fileName = "${DateTime.now().millisecondsSinceEpoch}.$ext";
+  //
+  //     // Upload file to Supabase Storage
+  //     await supabase.storage
+  //         .from('chat_files') // 👈 your bucket
+  //         .upload('task_$taskId/$fileName', file);
+  //
+  //     // Get public URL
+  //     final publicUrl = supabase.storage
+  //         .from('chat_files')
+  //         .getPublicUrl('task_$taskId/$fileName');
+  //
+  //     // Insert into task_chats table
+  //     await supabase.from('task_chats').insert({
+  //       'task_id': taskId,
+  //       'sender_id': senderId,
+  //       'senderName': senderName, // 👈 must match MessageEntity
+  //       'content': '',
+  //       'file_url': publicUrl,
+  //       'file_type': fileType,
+  //     });
+  //
+  //     print("sendFileMessage in task_chat_cubit done ");
+  //   } catch (e) {
+  //     print("Error sending file: $e");
+  //     emit(TaskChatError(e.toString()));
+  //   }
+  // }
+
   Future<void> sendFileMessage({
     required String taskId,
     required String senderId,
     required String senderName,
-    required File file,
+    required PlatformFile pickedFile, // 👈 change from dart:io File
   }) async {
     try {
-      final ext = file.path.split('.').last;
+      final ext = pickedFile.extension ?? 'file';
       final fileType = _detectFileType(ext);
-
       final fileName = "${DateTime.now().millisecondsSinceEpoch}.$ext";
 
-      // Upload file to Supabase Storage
-      await supabase.storage
-          .from('chat_files') // 👈 your bucket
-          .upload('task_$taskId/$fileName', file);
 
-      // Get public URL
+      if (kIsWeb) {
+        // ✅ WEB: Upload as bytes
+        final Uint8List fileBytes = pickedFile.bytes!;
+        await supabase.storage
+            .from('chat_files')
+            .uploadBinary('task_$taskId/$fileName', fileBytes);
+      } else {
+         // ✅ MOBILE/DESKTOP: Upload as bytes برضه
+        final file = File(pickedFile.path!);
+        final fileBytes = await file.readAsBytes();
+        await supabase.storage
+            .from('chat_files')
+            .uploadBinary('task_$taskId/$fileName', fileBytes);
+
+
+        // final String filePath = pickedFile.path!;
+        // await supabase.storage
+        //     .from('chat_files')
+        //     .upload('task_$taskId/$fileName', File(filePath));
+        // // final File file = File(pickedFile.path!);
+        // // await supabase.storage
+        // //     .from('chat_files')
+        // //     .upload('task_$taskId/$fileName', file);
+      }
+
+      // ✅ Get public URL
       final publicUrl = supabase.storage
           .from('chat_files')
           .getPublicUrl('task_$taskId/$fileName');
 
-      // Insert into task_chats table
+      // ✅ Insert into task_chats
       await supabase.from('task_chats').insert({
         'task_id': taskId,
         'sender_id': senderId,
-        'senderName': senderName, // 👈 must match MessageEntity
+        'senderName': senderName,
         'content': '',
         'file_url': publicUrl,
         'file_type': fileType,
       });
 
-      print("sendFileMessage in task_chat_cubit done ");
+      print("✅ sendFileMessage done!");
     } catch (e) {
-      print("Error sending file: $e");
+      print("❌ Error sending file: $e");
       emit(TaskChatError(e.toString()));
     }
   }
-
 
   String _detectFileType(String ext) {
     switch (ext.toLowerCase()) {
